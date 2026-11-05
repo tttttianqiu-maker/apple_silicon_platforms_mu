@@ -17,16 +17,13 @@
  **/
 #include <IndustryStandard/Acpi65.h>
 
- DefinitionBlock("DSDT.aml", "DSDT", 0x02, "Apple", "J31x", 0x8103) {
+ DefinitionBlock("DSDT.aml", "DSDT", 0x02, "Apple", "J613", 0x8122) {
     Scope(\_SB) {
-        // (J313 SPI input contract removed for J613.)
-        // hypervisor, and Windows driver resource contracts byte-for-byte in
-        // sync; never duplicate these machine-specific values in this DSDT.
         // J613: no SPI keyboard/trackpad. Input goes MTP -> DockChannel HID (needs a new driver).
         // Use a USB keyboard on the left Type-C port for bring-up.
 
         //
-        // Cluster low power states. On T8101/T8122, there are only 2 clusters, the P and E core clusters,
+        // Cluster low power states. On T8122 there are only 2 clusters, the P and E core clusters,
         // so should be easier to track
         //
         Name (CLPI, Package() {
