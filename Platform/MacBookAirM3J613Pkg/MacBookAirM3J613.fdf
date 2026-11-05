@@ -1,0 +1,362 @@
+#UEFI Flash Description File for MacBook Air, 2020 M1 model.
+#based on OnePlus6TPkg/OnePlus6TPkg.fdf
+#
+#  Copyright (c) 2018, Linaro Limited. All rights reserved.
+#
+#  This program and the accompanying materials
+#  are licensed and made available under the terms and conditions of the BSD License
+#  which accompanies this distribution.  The full text of the license may be found at
+#  http://opensource.org/licenses/bsd-license.php
+#
+#  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+#
+
+################################################################################
+#
+# FD Section
+# The [FD] Section is made up of the definition statements and a
+# description of what goes into  the Flash Device Image.  Each FD section
+# defines one flash "device" image.  A flash device image may be one of
+# the following: Removable media bootable image (like a boot floppy
+# image,) an Option ROM image (that would be "flashed" into an add-in
+# card,) a System "Flash"  image (that would be burned into a system's
+# flash) or an Update ("Capsule") image that will be used to update and
+# existing system flash.
+#
+################################################################################
+
+
+[FD.MacBookAirM3J613_EFI]
+# EXPERIMENT (not upstreamable as-is): PrePi.c hardcodes PcdFdBaseAddress when it
+# invalidates the FD cache range, so the image must live exactly where it is loaded.
+# Running under the m1n1 hypervisor (run_guest.py), load_raw() places the guest at
+# u.heap_top + 16MB + ADT + TrustCache, which on this machine lands at 0x84078c000.
+# The original 0x830000000 falls inside m1n1's own 768MB heap, so the loader cannot
+# be moved to it; the firmware has to be rebased instead.
+BaseAddress   = 0x8510B4000|gArmTokenSpaceGuid.PcdFdBaseAddress  # must match run_uefi.py's pinned load address
+Size          = 0x001E00000|gArmTokenSpaceGuid.PcdFdSize         # The size in bytes
+ErasePolarity = 1
+BlockSize     = 0x1000
+NumBlocks     = 0x1E00
+
+################################################################################
+#
+# Following are lists of FD Region layout which correspond to the locations of different
+# images within the flash device.
+#
+# Regions must be defined in ascending order and may not overlap.
+#
+# A Layout Region start with a eight digit hex offset (leading "0x" required) followed by
+# the pipe "|" character, followed by the size of the region, also in hex with the leading
+# "0x" characters. Like:
+# Offset|Size
+# PcdOffsetCName|PcdSizeCName
+# RegionType <FV, DATA, or FILE>
+#
+################################################################################
+
+# from ArmVirtPkg/ArmVirtQemuKernel.fdf
+#
+# Implement the Linux kernel header layout so that the loader (m1n1) will identify
+# it as something bootable, and execute it with a FDT pointer in x0 or r2.
+0x000000000|0x000008000
+DATA = {
+  0x01, 0x00, 0x00, 0x10,                         # code0: adr x1, .
+  0xff, 0x1f, 0x00, 0x14,                         # code1: b 0x8000
+  0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, # text_offset: 512 KB
+  0x00, 0x00, 0x0e, 0x10, 0x00, 0x00, 0x00, 0x00, # image_size: 30 MB
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, # flags
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, # res2
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, # res3
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, # res4
+  0x41, 0x52, 0x4d, 0x64,                         # magic: "ARM\x64"
+  0x00, 0x00, 0x00, 0x00                          # res5
+}
+
+0x000008000|0x001D80000
+gArmTokenSpaceGuid.PcdFvBaseAddress|gArmTokenSpaceGuid.PcdFvSize
+FV = FVMAIN_COMPACT
+
+
+################################################################################
+#
+# FV Section
+#
+# [FV] section is used to define what components or modules are placed within a flash
+# device file.  This section also defines order the components and modules are positioned
+# within the image.  The [FV] section consists of define statements, set statements and
+# module statements.
+#
+################################################################################
+
+[FV.FvMain]
+BlockSize          = 0x40
+FvAlignment        = 8         # FV alignment and FV attributes setting.
+ERASE_POLARITY     = 1
+MEMORY_MAPPED      = TRUE
+STICKY_WRITE       = TRUE
+LOCK_CAP           = TRUE
+LOCK_STATUS        = TRUE
+WRITE_DISABLED_CAP = TRUE
+WRITE_ENABLED_CAP  = TRUE
+WRITE_STATUS       = TRUE
+WRITE_LOCK_CAP     = TRUE
+WRITE_LOCK_STATUS  = TRUE
+READ_DISABLED_CAP  = TRUE
+READ_ENABLED_CAP   = TRUE
+READ_STATUS        = TRUE
+READ_LOCK_CAP      = TRUE
+READ_LOCK_STATUS   = TRUE
+
+  !include AppleSiliconPkg/Include/DXEApriori.fdf.inc
+
+  #Main DXE core
+  INF MdeModulePkg/Core/Dxe/DxeMain.inf
+
+  #
+  # PI DXE Drivers producing Architectural Protocols (EFI Services)
+  #
+  INF MdeModulePkg/Universal/PCD/Dxe/Pcd.inf
+  INF ArmPkg/Drivers/CpuDxe/CpuDxe.inf
+  INF MdeModulePkg/Core/RuntimeDxe/RuntimeDxe.inf
+  INF MdeModulePkg/Universal/SecurityStubDxe/SecurityStubDxe.inf
+  INF MdeModulePkg/Universal/CapsuleRuntimeDxe/CapsuleRuntimeDxe.inf
+  INF EmbeddedPkg/EmbeddedMonotonicCounter/EmbeddedMonotonicCounter.inf
+  INF MdeModulePkg/Universal/ResetSystemRuntimeDxe/ResetSystemRuntimeDxe.inf
+  INF EmbeddedPkg/RealTimeClockRuntimeDxe/RealTimeClockRuntimeDxe.inf
+  INF EmbeddedPkg/MetronomeDxe/MetronomeDxe.inf
+
+  INF MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf
+!if $(SECURE_BOOT_ENABLE) == TRUE
+  INF SecurityPkg/VariableAuthenticated/SecureBootConfigDxe/SecureBootConfigDxe.inf
+!endif
+
+  #
+  # Multiple Console IO support
+  #
+  INF MdeModulePkg/Universal/Console/ConPlatformDxe/ConPlatformDxe.inf
+  INF MdeModulePkg/Universal/Console/ConSplitterDxe/ConSplitterDxe.inf
+  #
+  # NOTE: do not drop this. Removing it (so that the serial console would be the only
+  # ConOut) made things worse: MsBootPolicy hangs at "USB boot desired, but no USB devices
+  # found on first attempt" and never reaches the Shell, whereas with it present BDS gets
+  # as far as loading Shell.efi.
+  #
+  INF MdeModulePkg/Universal/Console/GraphicsConsoleDxe/GraphicsConsoleDxe.inf
+  INF MdeModulePkg/Universal/Console/TerminalDxe/TerminalDxe.inf
+  #
+  # Serial console. Both of these are listed in AppleSiliconPkg.dsc.inc -- so they were
+  # being built -- but neither was packaged into the firmware volume, the same omission
+  # as the ACPI tables. Without them the only declared console is the internal display
+  # (DisplayDevicePath) and keypad, which is useless on a machine whose panel is dead:
+  # the log shows "DeviceBootManagerAfterConsole Unabled to set graphics - Unsupported".
+  # SerialDxe publishes SerialIo; TerminalDxe (packaged above) binds to it and produces a
+  # console with both SimpleTextIn and SimpleTextInputEx.
+  #
+  # EmbeddedPkg/SimpleTextInOutSerial used to sit on top instead. It is dropped, not just
+  # left unused: it grabs the same UART and assigns gST->ConIn itself, so it would fight
+  # TerminalDxe for input. It also provides no SimpleTextInputEx, which is precisely what
+  # the Windows boot manager opens before giving up with EFI_INVALID_PARAMETER.
+  #
+  INF MdeModulePkg/Universal/SerialDxe/SerialDxe.inf
+  INF ArmPkg/Drivers/TimerDxe/TimerDxe.inf
+!if $(AIC_BUILD) == FALSE
+  INF ArmPkg/Drivers/ArmGicDxe/ArmGicDxe.inf
+!else 
+  INF AppleSiliconPkg/Drivers/AppleAicDxe/AppleAicDxe.inf
+!endif
+  #
+  # NOTE: this driver cannot be dropped. Removing it was tried as a way to stop the boot
+  # watchdog from resetting the machine (the guest clock runs several times fast, so the
+  # five-minute watchdog fires after about a minute of real time). The result was that DXE
+  # dispatch never completes -- dozens of "Driver ... was discovered but not loaded!!" and
+  # then ASSERT [DxeCore] DxeMain.c(595): the Watchdog Timer Architectural Protocol is
+  # mandatory. The clock rate has to be fixed instead.
+  #
+  INF MdeModulePkg/Universal/WatchdogTimerDxe/WatchdogTimer.inf
+
+  INF AppleSiliconPkg/Drivers/SimpleFbDxe/SimpleFbDxe.inf
+
+  #
+  # PCIe Support
+  #
+  INF ArmPkg/Drivers/ArmPciCpuIo2Dxe/ArmPciCpuIo2Dxe.inf
+  INF MdeModulePkg/Bus/Pci/PciHostBridgeDxe/PciHostBridgeDxe.inf
+  INF MdeModulePkg/Bus/Pci/PciBusDxe/PciBusDxe.inf
+  INF MdeModulePkg/Bus/Pci/NonDiscoverablePciDeviceDxe/NonDiscoverablePciDeviceDxe.inf
+
+  #NVMe Support
+  # The native ANS2/SART controller remains owned by m1n1. UEFI sees the standards-facing
+  # PCIe/NVMe bridge exposed by the hypervisor, so the generic driver is sufficient.
+  #INF AppleSiliconPkg/Drivers/AppleANS2Dxe/AppleANS2Dxe.inf
+  INF MdeModulePkg/Bus/Pci/NvmExpressDxe/NvmExpressDxe.inf
+
+  #
+  # Virtual Keyboard
+  #
+  INF EmbeddedPkg/Drivers/VirtualKeyboardDxe/VirtualKeyboardDxe.inf
+  #INF OemPkg/FrontpageButtonsVolumeUp/FrontpageButtonsVolumeUp.inf
+
+  # FV FileSystem
+  INF MdeModulePkg/Universal/FvSimpleFileSystemDxe/FvSimpleFileSystemDxe.inf
+
+  #
+  # Usb Support
+  #
+  # The two Apple-specific pieces were missing here while being listed in
+  # AppleSiliconPkg.dsc.inc -- the same "built but never packaged" omission as the ACPI
+  # tables and the serial console. Without them nothing can be on the bus:
+  #   - AppleDartIoMmuDxe brings up the per-device IOMMU, needed for any DMA;
+  #   - AppleUsbTypeCBringupDxe brings up the Type-C/dwc3 controller, without which
+  #     XhciDxe finds no host controller and no USB device is ever enumerated.
+  #
+  INF AppleSiliconPkg/Drivers/AppleDartIoMmuDxe/AppleDartIoMmuDxe.inf
+  #
+  # Register the free Type-C port as a non-discoverable xHCI controller. The controller
+  # carrying m1n1's USB proxy is removed from the guest ADT; the bring-up driver skips
+  # missing nodes and only publishes the remaining controller to XhciDxe.
+  #
+  INF AppleSiliconPkg/Drivers/AppleUsbTypeCBringupDxe/AppleUsbTypeCBringupDxe.inf
+  INF  MdeModulePkg/Bus/Pci/UhciDxe/UhciDxe.inf
+  INF  MdeModulePkg/Bus/Pci/EhciDxe/EhciDxe.inf
+  INF  MdeModulePkg/Bus/Pci/XhciDxe/XhciDxe.inf
+  INF MdeModulePkg/Bus/Usb/UsbKbDxe/UsbKbDxe.inf
+  INF MdeModulePkg/Bus/Usb/UsbMouseAbsolutePointerDxe/UsbMouseAbsolutePointerDxe.inf
+  #
+  # USB Host Support
+  #
+  INF MdeModulePkg/Bus/Usb/UsbBusDxe/UsbBusDxe.inf
+
+  #
+  # USB Mass Storage Support
+  #
+  INF MdeModulePkg/Bus/Usb/UsbMassStorageDxe/UsbMassStorageDxe.inf
+  #
+  # Some miscellaneous Mu modules
+  #
+  INF  MsCorePkg/Universal/StatusCodeHandler/Serial/Dxe/SerialStatusCodeHandlerDxe.inf
+  #
+  # Dropped. It writes a "phase indicator" variable from its ExitBootServices callback and
+  # ASSERTs if the write fails. There is no non-volatile variable storage on this bench, so
+  # the write returns Invalid Parameter and the assert halts the machine - right after the
+  # Windows boot manager has called ExitBootServices, i.e. one step short of the kernel:
+  #
+  #   BS: ExitBootServices handle=... mapkey=0x675
+  #   BS: RT:SetVariable EBS ... -> Invalid Parameter
+  #   ASSERT [MuVarPolicyFoundationDxe] MuVarPolicyFoundationDxe.c(71)
+  #
+  # The driver only exists to stamp variable-policy phase markers, which are meaningless
+  # without a variable store.
+  #
+  # INF  MsCorePkg/MuVarPolicyFoundationDxe/MuVarPolicyFoundationDxe.inf
+
+  #
+  # FAT filesystem + GPT/MBR partitioning
+  #
+  INF MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
+  INF MdeModulePkg/Universal/Disk/PartitionDxe/PartitionDxe.inf
+  INF FatPkg/EnhancedFatDxe/Fat.inf
+  INF MdeModulePkg/Universal/Disk/UnicodeCollation/EnglishDxe/EnglishDxe.inf
+  INF MdeModulePkg/Universal/Disk/RamDiskDxe/RamDiskDxe.inf
+  INF AppleSiliconPkg/Drivers/BootRamdiskHelperDxe/BootRamdiskHelperDxe.inf
+  INF AppleSiliconPkg/Drivers/WindowsAutoBootDxe/WindowsAutoBootDxe.inf
+
+
+  INF MdeModulePkg/Universal/HiiDatabaseDxe/HiiDatabaseDxe.inf
+
+  #
+  # ACPI Support
+  #
+  INF MdeModulePkg/Universal/Acpi/AcpiTableDxe/AcpiTableDxe.inf
+  INF AppleSiliconPkg/Drivers/AcpiPlatformDxe/AcpiPlatformDxe.inf
+  INF MdeModulePkg/Universal/Acpi/BootGraphicsResourceTableDxe/BootGraphicsResourceTableDxe.inf
+  INF RuleOverride=ACPITABLE MacBookAirM3J613Pkg/AcpiTables/DeviceAcpiTables.inf
+  INF RuleOverride=ACPITABLE T8122FamilyPkg/AcpiTables/CPUAcpiTables.inf
+  #
+  # The generic tables were missing here. AcpiPlatformDxe looks all three sets up by
+  # GUID (device / SoC / generic) and asserts if any is absent:
+  #   AcpiPlatformEntryPoint: Failed to locate generic tables, status Not Found
+  #   ASSERT [AcpiPlatform] AcpiPlatform.c(646)
+  # The module is listed in AppleSiliconPkg.dsc.inc, so it was being built -- it just
+  # never made it into the firmware volume.
+  #
+  INF RuleOverride=ACPITABLE AppleSiliconPkg/AcpiTables/GenericAcpiTables.inf
+  #
+  # Same omission for the fourth and last set the driver requires (device family):
+  #   AcpiPlatformEntryPoint: Failed to locate device family tables, status Not Found
+  #   ASSERT [AcpiPlatform] AcpiPlatform.c(711)
+  # Listed in MacBookAirFamily.dsc.inc, so likewise built but never packaged.
+  #
+  INF RuleOverride=ACPITABLE MacBookAirFamilyPkg/AcpiTables/DeviceFamilyAcpiTables.inf
+  #
+  # SMBIOS Support
+  #
+  INF AppleSiliconPkg/Drivers/SmbiosInfoDxe/SmbiosInfoDxe.inf
+  INF MdeModulePkg/Universal/SmbiosDxe/SmbiosDxe.inf
+
+  #
+  # UEFI applications
+  #
+  INF ShellPkg/Application/Shell/Shell.inf
+!ifdef $(INCLUDE_TFTP_COMMAND)
+  INF ShellPkg/DynamicCommand/TftpDynamicCommand/TftpDynamicCommand.inf
+!endif #$(INCLUDE_TFTP_COMMAND)
+
+  #
+  # Bds
+  #
+  INF AppleSiliconPkg/Drivers/ColorbarsDxe/ColorbarsDxe.inf
+  INF MdeModulePkg/Universal/PrintDxe/PrintDxe.inf
+  INF MdeModulePkg/Universal/DevicePathDxe/DevicePathDxe.inf
+  INF MdeModulePkg/Universal/DisplayEngineDxe/DisplayEngineDxe.inf
+  INF MdeModulePkg/Universal/SetupBrowserDxe/SetupBrowserDxe.inf
+  INF MdeModulePkg/Universal/DriverHealthManagerDxe/DriverHealthManagerDxe.inf
+  INF MdeModulePkg/Universal/BdsDxe/BdsDxe.inf
+
+  # DT
+  #INF EmbeddedPkg/Drivers/DtPlatformDxe/DtPlatformDxe.inf
+  FILE FREEFORM = PCD(gMsCorePkgTokenSpaceGuid.PcdRegulatoryGraphicFileGuid) {
+    SECTION RAW = MacBookAirM3J613Pkg/Resources/RegulatoryLogos.png
+  }
+
+  # Embedded RAMDisk (IMG format)
+  # The Type-C ports cannot be used as a boot medium on this bench: iBoot only sets a
+  # port up as a host when it boots from it, and we boot m1n1 off the internal disk, so
+  # the port is left unconfigured and never sources VBUS. An FV-embedded RAMDisk gives
+  # BlockIo with no USB involved at all. Sparse images cost almost nothing here because
+  # FvMain is LZMA-compressed into FVMAIN_COMPACT.
+  FILE FREEFORM = 650B7CD0-94F8-46CC-88DE-8C199D41EDA3 {
+    SECTION RAW = AppleSiliconPkg/RAMDisk/ramtest.img
+    SECTION UI = "Embedded RAMDisk"
+  }
+  
+!include AppleSiliconPkg/FrontpageFdf.inc
+
+[FV.FVMAIN_COMPACT]
+FvAlignment        = 8
+ERASE_POLARITY     = 1
+MEMORY_MAPPED      = TRUE
+STICKY_WRITE       = TRUE
+LOCK_CAP           = TRUE
+LOCK_STATUS        = TRUE
+WRITE_DISABLED_CAP = TRUE
+WRITE_ENABLED_CAP  = TRUE
+WRITE_STATUS       = TRUE
+WRITE_LOCK_CAP     = TRUE
+WRITE_LOCK_STATUS  = TRUE
+READ_DISABLED_CAP  = TRUE
+READ_ENABLED_CAP   = TRUE
+READ_STATUS        = TRUE
+READ_LOCK_CAP      = TRUE
+READ_LOCK_STATUS   = TRUE
+
+  INF RuleOverride = SELF_RELOC AppleSiliconPkg/PrePi/PrePi.inf
+
+  FILE FV_IMAGE = 9E21FD93-9C72-4c15-8C4B-E77F1DB2D792 {
+    SECTION GUIDED EE4E5898-3914-4259-9D6E-DC7BD79403CF PROCESSING_REQUIRED = TRUE {
+      SECTION FV_IMAGE = FVMAIN
+    }
+  }
+
+!include AppleSiliconPkg/AppleSiliconFdfRules.fdf.inc
