@@ -34,7 +34,7 @@
 # u.heap_top + 16MB + ADT + TrustCache, which on this machine lands at 0x84078c000.
 # The original 0x830000000 falls inside m1n1's own 768MB heap, so the loader cannot
 # be moved to it; the firmware has to be rebased instead.
-BaseAddress   = 0x8510B4000|gArmTokenSpaceGuid.PcdFdBaseAddress  # must match run_uefi.py's pinned load address
+BaseAddress   = 0x100510B4000|gArmTokenSpaceGuid.PcdFdBaseAddress  # must match run_uefi.py's pinned load address
 Size          = 0x001E00000|gArmTokenSpaceGuid.PcdFdSize         # The size in bytes
 ErasePolarity = 1
 BlockSize     = 0x1000

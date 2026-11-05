@@ -1,8 +1,8 @@
 [PcdsPatchableInModule.common]
   #These will get overriden by the FDT settings
-  # TODO(j613): M1 value. Verify M3 DRAM base from the ADT "dram-base" (m1n1 prints it at boot).
-  gArmTokenSpaceGuid.PcdSystemMemoryBase|0x800000000
-  gArmTokenSpaceGuid.PcdSystemMemorySize|0x200000000 #8GB RAM space by default
+  # J613 ADT /chosen: dram-base 0x10000000000, dram-size 0x400000000 (probe 2026-11-05)
+  gArmTokenSpaceGuid.PcdSystemMemoryBase|0x10000000000
+  gArmTokenSpaceGuid.PcdSystemMemorySize|0x400000000 #16GB
   gArmTokenSpaceGuid.PcdFdBaseAddress|0x0
   gArmTokenSpaceGuid.PcdFvBaseAddress|0x0
   gAppleSiliconPkgTokenSpaceGuid.PcdFrameBufferAddress|0x0
