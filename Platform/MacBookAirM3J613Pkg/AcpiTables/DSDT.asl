@@ -23,6 +23,32 @@
         // Use a USB keyboard on the left Type-C port for bring-up.
 
         //
+        // MTP DockChannel HID (built-in keyboard + trackpad), from t8122.dtsi /
+        // t8122-j613.dts (mtp_dockchannel, mtp_hid). The MTP coprocessor itself must
+        // already be running (RTKit boot + DART) before a Windows driver touches this;
+        // that is a hypervisor job, not done yet. Driver: drivers/apple-dchid.
+        // TX/RX are sub-interrupts 2/3 of the FIFO's own IRQ block, which is wired
+        // to AIC 824. apple,fifo-size = 0x800.
+        //
+        Device(DCH0) {
+            Name(_HID, "APPL0DC1")   // APPL + hex id (ACPI rule): DockChannel HID
+            Name(_UID, Zero)
+            Name(_STA, 0x0B)   // present + functioning, hidden until a driver exists
+            Name(_CRS, ResourceTemplate() {
+                QWordMemory(ResourceConsumer, PosDecode, MinFixed, MaxFixed, NonCacheable, ReadWrite,
+                    0x0000000000000000, 0x00000002FAB30000, 0x00000002FAB30FFF,
+                    0x0000000000000000, 0x0000000000001000)   // config
+                QWordMemory(ResourceConsumer, PosDecode, MinFixed, MaxFixed, NonCacheable, ReadWrite,
+                    0x0000000000000000, 0x00000002FAB34000, 0x00000002FAB34FFF,
+                    0x0000000000000000, 0x0000000000001000)   // data
+                QWordMemory(ResourceConsumer, PosDecode, MinFixed, MaxFixed, NonCacheable, ReadWrite,
+                    0x0000000000000000, 0x00000002FAB14000, 0x00000002FAB17FFF,
+                    0x0000000000000000, 0x0000000000004000)   // FIFO irq block
+                Interrupt(ResourceConsumer, Level, ActiveHigh, Exclusive) { 824 }
+            })
+        }
+
+        //
         // Cluster low power states. On T8122 there are only 2 clusters, the P and E core clusters,
         // so should be easier to track
         //
