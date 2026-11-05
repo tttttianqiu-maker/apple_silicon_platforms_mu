@@ -166,7 +166,7 @@
         // The Type-C port not occupied by the m1n1 proxy. AppleUsbTypeCBringupDxe
         // leaves this DWC3 instance in xHCI host mode and its DARTs in bypass, so
         // Windows can bind the inbox USBXHCI driver directly to the standard xHCI
-        // register window. AIC 857 is usb-drd1's level-high interrupt on T8122.
+        // register window. Physical AIC 1030 on T8122; m1n1 delivers it as guest INTID 857.
         //
         Device(XHC1) {
             // This DWC3 has no standard xHCI debug capability.  PNP0D10 selects the
@@ -185,7 +185,7 @@
                     0x0000000000000000, // Translation
                     0x0000000000100000  // Length (1 MB)
                 )
-                Interrupt(ResourceConsumer, Level, ActiveHigh, Exclusive) { 1030 }
+                Interrupt(ResourceConsumer, Level, ActiveHigh, Exclusive) { 857 }   // guest INTID; m1n1 routes physical AIC 1030 here
             })
             Method(_STA) { Return(0xF) }
         }
