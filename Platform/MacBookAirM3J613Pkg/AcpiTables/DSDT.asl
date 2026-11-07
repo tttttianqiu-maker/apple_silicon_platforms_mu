@@ -19,32 +19,25 @@
 
  DefinitionBlock("DSDT.aml", "DSDT", 0x02, "Apple", "J613", 0x8122) {
     Scope(\_SB) {
-        // J613: no SPI keyboard/trackpad. Input goes MTP -> DockChannel HID (needs a new driver).
-        // Use a USB keyboard on the left Type-C port for bring-up.
-
         //
-        // MTP DockChannel HID (built-in keyboard + trackpad), from t8122.dtsi /
-        // t8122-j613.dts (mtp_dockchannel, mtp_hid). The MTP coprocessor itself must
-        // already be running (RTKit boot + DART) before a Windows driver touches this;
-        // that is a hypervisor job, not done yet. Driver: drivers/apple-dchid.
-        // TX/RX are sub-interrupts 2/3 of the FIFO's own IRQ block, which is wired
-        // to AIC 824. apple,fifo-size = 0x800.
+        // Built-in keyboard + trackpad (J613 has no SPI HID; input is MTP ->
+        // DockChannel HID). m1n1 owns the MTP coprocessor, DockChannel, the
+        // trackpad firmware and SMC GPIO power sequencing (m1n1 hv_dchid.c) and
+        // exposes the HID reports as the "AVHD" virtual device: one 4 KiB
+        // trapped MMIO page and one edge-triggered virtual SPI. m1n1 always
+        // backs the page on T8122; STATUS reads 0 if the MTP did not come up.
+        // Driver: drivers/apple-input/windows/AppleMtpInput.inf (ACPI\APPL0613).
+        // Must match HV_AVHD_IPA / HV_AVHD_GSIV in m1n1_windows/src/hv_dchid.h.
         //
-        Device(DCH0) {
-            Name(_HID, "APPL0DC1")   // APPL + hex id (ACPI rule): DockChannel HID
+        Device(AVHD) {
+            Name(_HID, "APPL0613")
             Name(_UID, Zero)
-            Name(_STA, 0x0B)   // present + functioning, hidden until a driver exists
+            Name(_STA, 0x0F)
             Name(_CRS, ResourceTemplate() {
                 QWordMemory(ResourceConsumer, PosDecode, MinFixed, MaxFixed, NonCacheable, ReadWrite,
-                    0x0000000000000000, 0x00000002FAB30000, 0x00000002FAB30FFF,
-                    0x0000000000000000, 0x0000000000001000)   // config
-                QWordMemory(ResourceConsumer, PosDecode, MinFixed, MaxFixed, NonCacheable, ReadWrite,
-                    0x0000000000000000, 0x00000002FAB34000, 0x00000002FAB34FFF,
-                    0x0000000000000000, 0x0000000000001000)   // data
-                QWordMemory(ResourceConsumer, PosDecode, MinFixed, MaxFixed, NonCacheable, ReadWrite,
-                    0x0000000000000000, 0x00000002FAB14000, 0x00000002FAB17FFF,
-                    0x0000000000000000, 0x0000000000004000)   // FIFO irq block
-                Interrupt(ResourceConsumer, Level, ActiveHigh, Exclusive) { 824 }
+                    0x0000000000000000, 0x0000005300000000, 0x0000005300000FFF,
+                    0x0000000000000000, 0x0000000000001000)
+                Interrupt(ResourceConsumer, Edge, ActiveHigh, Exclusive) { 65 }
             })
         }
 
