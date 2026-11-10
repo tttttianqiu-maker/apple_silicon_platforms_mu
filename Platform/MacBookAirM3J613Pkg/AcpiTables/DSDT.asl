@@ -79,44 +79,85 @@
                 }
                 Return (Zero)
             }
-            Method(_BIF, 0, Serialized) {
-                Name(BIFP, Package(13) {
-                    One,            // power unit: mA / mAh
+            //
+            // Windows wants milliwatts (Microsoft "ACPI battery and power subsystem
+            // firmware implementation": _BIX revision 0, power unit 0, serial not
+            // empty, accuracy >= 95 %). m1n1 serves mA/mAh; everything is scaled
+            // by the design voltage, so percentages and time estimates stay
+            // exact. Each register is read once per method (every read traps).
+            //
+            Method(_BIX, 0, Serialized) {
+                Name(BIXP, Package(20) {
+                    Zero,           // revision 0
+                    Zero,           // power unit: mW / mWh
                     Zero,           // design capacity
                     Zero,           // last full charge capacity
                     One,            // rechargeable
-                    Zero,           // design voltage
+                    Zero,           // design voltage, mV
                     Zero,           // design capacity of warning
                     Zero,           // design capacity of low
-                    One,            // granularity 1
-                    One,            // granularity 2
+                    Zero,           // cycle count
+                    95000,          // measurement accuracy, 95 %
+                    60000,          // max sampling time, ms (m1n1 reads every 60 s)
+                    60000,          // min sampling time, ms
+                    0xFFFFFFFF,     // max averaging interval: unknown
+                    0xFFFFFFFF,     // min averaging interval: unknown
+                    One,            // granularity 1, mWh
+                    One,            // granularity 2, mWh
                     "MacBook Air",  // model
-                    "",             // serial
+                    "J613",         // serial
                     "LION",         // type
                     "Apple"         // OEM
                 })
-                BIFP[1] = BDCP
-                BIFP[2] = BFCP
-                BIFP[4] = BDVO
-                BIFP[5] = (BFCP * 7) / 100
-                BIFP[6] = (BFCP * 3) / 100
+                Local0 = BDVO
+                Local1 = (BDCP * Local0) / 1000
+                BIXP[2] = Local1
+                BIXP[3] = (BFCP * Local0) / 1000
+                BIXP[5] = Local0
+                BIXP[6] = (Local1 * 7) / 100
+                BIXP[7] = (Local1 * 3) / 100
+                Local2 = BCYC
+                If (Local2 == 0xFFFFFFFF) {
+                    Local2 = Zero
+                }
+                BIXP[8] = Local2
+                Return (BIXP)
+            }
+            Method(_BIF, 0, Serialized) {
+                Name(BIFP, Package(13) {
+                    Zero, Zero, Zero, One, Zero, Zero, Zero, One, One,
+                    "MacBook Air", "J613", "LION", "Apple"
+                })
+                Local0 = _BIX()
+                BIFP[0] = DerefOf(Local0[1])
+                BIFP[1] = DerefOf(Local0[2])
+                BIFP[2] = DerefOf(Local0[3])
+                BIFP[4] = DerefOf(Local0[5])
+                BIFP[5] = DerefOf(Local0[6])
+                BIFP[6] = DerefOf(Local0[7])
                 Return (BIFP)
             }
             Method(_BST, 0, Serialized) {
                 Name(BSTP, Package(4) { Zero, Zero, Zero, Zero })
+                Local1 = BFLG
+                Local2 = BDVO
                 Local0 = Zero
-                If (BFLG & 8) {
+                If (Local1 & 8) {
                     Local0 |= 1     // discharging
                 }
-                If (BFLG & 4) {
+                If (Local1 & 4) {
                     Local0 |= 2     // charging
                 }
-                If (BFLG & 0x10) {
+                If (Local1 & 0x10) {
                     Local0 |= 4     // critical
                 }
                 BSTP[0] = Local0
-                BSTP[1] = BRAT
-                BSTP[2] = BRCP
+                Local3 = BRAT
+                If (Local3 != 0xFFFFFFFF) {
+                    Local3 = (Local3 * Local2) / 1000
+                }
+                BSTP[1] = Local3
+                BSTP[2] = (BRCP * Local2) / 1000
                 BSTP[3] = BVOL
                 Return (BSTP)
             }
