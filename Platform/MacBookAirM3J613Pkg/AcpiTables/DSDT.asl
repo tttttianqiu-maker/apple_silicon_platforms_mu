@@ -54,7 +54,7 @@
         // clear (battery off, or an m1n1 without it: the page reads 0 there)
         // hides both devices.
         //
-        OperationRegion(BATR, SystemMemory, 0x0000005300000100, 0x2C)
+        OperationRegion(BATR, SystemMemory, 0x0000005300000100, 0x30)
         Field(BATR, DWordAcc, NoLock, Preserve) {
             BMAG, 32,   // "BATT"
             BFLG, 32,   // bit0 present, 1 AC, 2 charging, 3 discharging, 4 critical
@@ -67,6 +67,7 @@
             BDVO, 32,   // design voltage, mV
             BPCT, 32,   // percent
             BSEQ, 32,   // refresh counter
+            BEVT, 32,   // read-to-clear: bit0 _BST, bit1 AC, bit2 _BIX changed
         }
 
         Device(BAT0) {
@@ -175,6 +176,40 @@
             }
             Method(_PSR, 0, Serialized) {
                 Return ((BFLG >> 1) & 1)
+            }
+        }
+
+        //
+        // Battery change events: ACPI Generic Event Device on edge vSPI 66
+        // (m1n1 HV_IRQ_SYNTHETIC_BATT_VINTID; Windows 11 Arm binds ACPI0013 to
+        // its inbox ACPI driver). m1n1 raises it after a refresh that changed
+        // something; _EVT reads (and clears) BEVT and notifies, so Windows
+        // updates the battery icon and the AC state at once instead of polling.
+        // Present only while the battery is.
+        //
+        Device(BGED) {
+            Name(_HID, "ACPI0013")
+            Name(_UID, One)
+            Method(_STA, 0, Serialized) {
+                If (BFLG & 1) {
+                    Return (0x0F)
+                }
+                Return (Zero)
+            }
+            Name(_CRS, ResourceTemplate() {
+                Interrupt(ResourceConsumer, Edge, ActiveHigh, Exclusive) { 66 }
+            })
+            Method(_EVT, 1, Serialized) {
+                Local0 = BEVT
+                If (Local0 & 2) {
+                    Notify(\_SB.ADP1, 0x80)
+                }
+                If (Local0 & 4) {
+                    Notify(\_SB.BAT0, 0x81)
+                }
+                If (Local0 & 1) {
+                    Notify(\_SB.BAT0, 0x80)
+                }
             }
         }
 
