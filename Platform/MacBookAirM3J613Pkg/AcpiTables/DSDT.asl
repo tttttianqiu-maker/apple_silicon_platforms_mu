@@ -47,6 +47,97 @@
         }
 
         //
+        // Battery + AC adapter (m1n1 hv_battery.c, `j613 battery on`): m1n1 reads
+        // the SMC battery keys read-only (as Linux macsmc-power) and serves them
+        // in the AVHD page at +0x100 (layout: m1n1_windows/src/dchid_proto.h
+        // DCHID_BATT_*). Windows' inbox cmbatt.sys drives PNP0C0A. BFLG bit 0
+        // clear (battery off, or an m1n1 without it: the page reads 0 there)
+        // hides both devices.
+        //
+        OperationRegion(BATR, SystemMemory, 0x0000005300000100, 0x2C)
+        Field(BATR, DWordAcc, NoLock, Preserve) {
+            BMAG, 32,   // "BATT"
+            BFLG, 32,   // bit0 present, 1 AC, 2 charging, 3 discharging, 4 critical
+            BDCP, 32,   // design capacity, mAh
+            BFCP, 32,   // last full charge capacity, mAh
+            BRCP, 32,   // remaining capacity, mAh
+            BRAT, 32,   // present rate, mA
+            BVOL, 32,   // present voltage, mV
+            BCYC, 32,   // cycle count
+            BDVO, 32,   // design voltage, mV
+            BPCT, 32,   // percent
+            BSEQ, 32,   // refresh counter
+        }
+
+        Device(BAT0) {
+            Name(_HID, EisaId("PNP0C0A"))
+            Name(_UID, One)
+            Name(_PCL, Package() { \_SB })
+            Method(_STA, 0, Serialized) {
+                If (BFLG & 1) {
+                    Return (0x1F)
+                }
+                Return (Zero)
+            }
+            Method(_BIF, 0, Serialized) {
+                Name(BIFP, Package(13) {
+                    One,            // power unit: mA / mAh
+                    Zero,           // design capacity
+                    Zero,           // last full charge capacity
+                    One,            // rechargeable
+                    Zero,           // design voltage
+                    Zero,           // design capacity of warning
+                    Zero,           // design capacity of low
+                    One,            // granularity 1
+                    One,            // granularity 2
+                    "MacBook Air",  // model
+                    "",             // serial
+                    "LION",         // type
+                    "Apple"         // OEM
+                })
+                BIFP[1] = BDCP
+                BIFP[2] = BFCP
+                BIFP[4] = BDVO
+                BIFP[5] = (BFCP * 7) / 100
+                BIFP[6] = (BFCP * 3) / 100
+                Return (BIFP)
+            }
+            Method(_BST, 0, Serialized) {
+                Name(BSTP, Package(4) { Zero, Zero, Zero, Zero })
+                Local0 = Zero
+                If (BFLG & 8) {
+                    Local0 |= 1     // discharging
+                }
+                If (BFLG & 4) {
+                    Local0 |= 2     // charging
+                }
+                If (BFLG & 0x10) {
+                    Local0 |= 4     // critical
+                }
+                BSTP[0] = Local0
+                BSTP[1] = BRAT
+                BSTP[2] = BRCP
+                BSTP[3] = BVOL
+                Return (BSTP)
+            }
+        }
+
+        Device(ADP1) {
+            Name(_HID, "ACPI0003")
+            Name(_UID, One)
+            Name(_PCL, Package() { \_SB })
+            Method(_STA, 0, Serialized) {
+                If (BFLG & 1) {
+                    Return (0x0F)
+                }
+                Return (Zero)
+            }
+            Method(_PSR, 0, Serialized) {
+                Return ((BFLG >> 1) & 1)
+            }
+        }
+
+        //
         // Cluster low power states. On T8122 there are only 2 clusters, the P and E core clusters,
         // so should be easier to track
         //
