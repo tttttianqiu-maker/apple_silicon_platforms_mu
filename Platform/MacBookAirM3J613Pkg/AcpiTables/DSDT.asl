@@ -392,8 +392,11 @@
             // into the vGIC (write a Group-1 LR + update_vi, same as the timer PPIs) with level
             // semantics tied to "unread CQ entries" - no AIC software line, so no AIC<->vGIC
             // namespace mixing. Level/ActiveLow is the INTx default for a GSIV _PRT entry.
+            // dev1 = the virtio-net function backed by the built-in Wi-Fi (m1n1 hv_vnet.c,
+            // present only when m1n1 brought the Wi-Fi up), same direct-inject scheme on 67.
             Name(_PRT, Package() {
-                Package() { 0x0000FFFF, 0, Zero, 64 }   // dev0 INTA -> GSIV 64 (vSPI, direct inject)
+                Package() { 0x0000FFFF, 0, Zero, 64 },  // dev0 INTA -> GSIV 64 (vSPI, direct inject)
+                Package() { 0x0001FFFF, 0, Zero, 67 }   // dev1 INTA -> GSIV 67 (virtio-net, Wi-Fi)
             })
 
             // _OSC: hard NT requirement for a PNP0A08 root. Without it acpi.sys treats the
