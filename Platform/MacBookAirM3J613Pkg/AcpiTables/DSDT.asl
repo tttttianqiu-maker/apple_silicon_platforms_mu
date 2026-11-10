@@ -29,9 +29,14 @@
         // Driver: drivers/apple-input/windows/AppleMtpInput.inf (ACPI\APPL0613).
         // Must match HV_AVHD_IPA / HV_AVHD_GSIV in m1n1_windows/src/hv_dchid.h.
         //
+        // _UID is the Windows device instance ID (ACPI\APPL0613\<UID>). Windows
+        // Setup enumerated ACPI\APPL0613\0 before AppleMtpInput existed and
+        // left it at Code 28 (no driver); a driver staged offline later (DISM)
+        // is not retried on that devnode. A new _UID is new hardware to PnP,
+        // which then installs the staged driver by itself (EXP-20261110-054).
         Device(AVHD) {
             Name(_HID, "APPL0613")
-            Name(_UID, Zero)
+            Name(_UID, 0x613)
             Name(_STA, 0x0F)
             Name(_CRS, ResourceTemplate() {
                 QWordMemory(ResourceConsumer, PosDecode, MinFixed, MaxFixed, NonCacheable, ReadWrite,
