@@ -30,6 +30,7 @@
   AppleSiliconPkg/AppleSiliconPkg.dec
 
 [LibraryClasses]
+  AppleDTLib
   UefiLib
   PcdLib
   DebugLib

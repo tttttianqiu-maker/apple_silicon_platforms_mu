@@ -27,6 +27,7 @@
 #include <Library/UefiLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/DebugLib.h>
+#include <Library/AppleDTLib.h>
 #include <IndustryStandard/Acpi.h>
 #include <Guid/Acpi.h>
 
@@ -534,6 +535,63 @@ AcpiPlatformChecksum (
   Buffer[ChecksumOffset] = CalculateCheckSum8 (Buffer, Size);
 }
 
+/**
+  windows-on-m1 escape hatch for the J613 keyboard/trackpad device: when the host
+  sets ADT /chosen "wom-avhd-off" (`j613 mtp off`, run_uefi.py), the AVHD device
+  (_HID "APPL0613") reports itself absent - its Name(_STA, 0x0F) becomes 0 - so
+  Windows never loads AppleMtpInput for it. Lets Windows boot if that driver
+  ever crashes it at start-up. Any other DSDT, or no property: untouched.
+
+  @param  Table           ACPI table about to be installed (writable copy)
+  @param  Size            Its length
+
+**/
+STATIC
+VOID
+AcpiPlatformApplyHostSwitches (
+  IN OUT UINT8  *Table,
+  IN     UINTN  Size
+  )
+{
+  STATIC CONST UINT8  Hid[] = { 'A', 'P', 'P', 'L', '0', '6', '1', '3', 0 };
+  STATIC CONST UINT8  Sta[] = { 0x08, '_', 'S', 'T', 'A', 0x0A, 0x0F }; // Name(_STA, 0x0F)
+  dt_node_t           *Chosen;
+  size_t              Len;
+  UINTN               HidAt;
+  UINTN               Index;
+
+  if ((Size < sizeof (EFI_ACPI_DESCRIPTION_HEADER)) ||
+      (((EFI_ACPI_DESCRIPTION_HEADER *)Table)->Signature != SIGNATURE_32 ('D', 'S', 'D', 'T')))
+  {
+    return;
+  }
+
+  Chosen = dt_get ("chosen");
+  if ((Chosen == NULL) || (dt_prop (Chosen, "wom-avhd-off", &Len) == NULL)) {
+    return;
+  }
+
+  for (HidAt = 0; HidAt + sizeof (Hid) <= Size; HidAt++) {
+    if (CompareMem (Table + HidAt, Hid, sizeof (Hid)) == 0) {
+      break;
+    }
+  }
+
+  //
+  // In the AML the device's _STA follows its _HID within a few bytes (17 in the J613
+  // DSDT); stay inside the AVHD body.
+  //
+  for (Index = HidAt; (Index + sizeof (Sta) <= Size) && (Index < HidAt + 64); Index++) {
+    if (CompareMem (Table + Index, Sta, sizeof (Sta)) == 0) {
+      Table[Index + sizeof (Sta) - 1] = 0;
+      DEBUG ((DEBUG_ERROR, "ACPI: AVHD (APPL0613) hidden by the host (wom-avhd-off)\n"));
+      return;
+    }
+  }
+
+  DEBUG ((DEBUG_ERROR, "ACPI: wom-avhd-off set, but no AVHD Name(_STA, 0x0F) in the DSDT\n"));
+}
+
 // EFI_STATUS AcpiPlatformInstallMadtTable(VOID) {
 //   //
 //   // We need to install an MADT - we can use the same table regardless of
@@ -661,6 +719,7 @@ AcpiPlatformEntryPoint (
       //
       // Checksum ACPI table
       //
+      AcpiPlatformApplyHostSwitches ((UINT8 *)CurrentTable, TableSize);
       AcpiPlatformChecksum ((UINT8 *)CurrentTable, TableSize);
 
       //
@@ -741,6 +800,7 @@ AcpiPlatformEntryPoint (
       //
       // Checksum ACPI table
       //
+      AcpiPlatformApplyHostSwitches ((UINT8 *)CurrentTable, TableSize);
       AcpiPlatformChecksum ((UINT8 *)CurrentTable, TableSize);
 
       //
@@ -829,6 +889,7 @@ AcpiPlatformEntryPoint (
       //
       // Checksum ACPI table
       //
+      AcpiPlatformApplyHostSwitches ((UINT8 *)CurrentTable, TableSize);
       AcpiPlatformChecksum ((UINT8 *)CurrentTable, TableSize);
 
       //
@@ -910,6 +971,7 @@ AcpiPlatformEntryPoint (
       //
       // Checksum ACPI table
       //
+      AcpiPlatformApplyHostSwitches ((UINT8 *)CurrentTable, TableSize);
       AcpiPlatformChecksum ((UINT8 *)CurrentTable, TableSize);
 
       //
