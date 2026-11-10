@@ -31,8 +31,12 @@
   MdePkg/MdePkg.dec
   MdeModulePkg/MdeModulePkg.dec
   EmbeddedPkg/EmbeddedPkg.dec
+  AppleSiliconPkg/AppleSiliconPkg.dec
 
 [LibraryClasses]
+  AppleDTLib
+  BaseLib
+  TimeBaseLib
   IoLib
   DebugLib
   TimerLib

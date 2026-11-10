@@ -26,8 +26,22 @@
 #include <Library/PcdLib.h>
 #include <Library/RealTimeClockLib.h>
 #include <Library/TimerLib.h>
+#include <Library/TimeBaseLib.h>
+#include <Library/AppleDTLib.h>
 
 STATIC EFI_TIME BaseTime;
+
+//
+// Wall clock handed over by the host for this boot (windows-on-m1 run_uefi.py):
+// ADT /chosen "wom-wall-clock" = { UINT64 local seconds since 1970, UINT64 physical
+// counter (CNTPCT) at that moment }. Read once while boot services run; at runtime
+// GetTime only adds the counter delta (no MMIO, no ADT access). Local time, because
+// Windows keeps the RTC in local time by default. Without the property the clock
+// falls back to the old relative 2019-01 behaviour.
+//
+STATIC UINT64  mWallSeconds;
+STATIC UINT64  mWallCounter;
+STATIC BOOLEAN mWallValid;
 
 /**
 Returns the current time and date information, and the time-keeping capabilities
@@ -74,6 +88,18 @@ LibGetTime(OUT EFI_TIME *Time, OUT EFI_TIME_CAPABILITIES *Capabilities)
     Capabilities->Accuracy   = 0;
     Capabilities->Resolution = Freq;
     Capabilities->SetsToZero = FALSE;
+  }
+
+  if (mWallValid) {
+    UINT64 Now     = GetPerformanceCounter();
+    UINT64 Seconds = mWallSeconds;
+    if (Now > mWallCounter) {
+      Seconds += (Now - mWallCounter) / Freq;
+    }
+    EpochToEfiTime((UINTN)Seconds, Time);
+    Time->TimeZone = EFI_UNSPECIFIED_TIMEZONE;
+    Time->Daylight = 0;
+    return EFI_SUCCESS;
   }
 
   UINT64 ElapsedSeconds = GetPerformanceCounter() / Freq;
@@ -202,6 +228,22 @@ LibRtcInitialize(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
 {
   BaseTime.Year  = 2019;
   BaseTime.Month = 1;
+
+  dt_node_t *Chosen = dt_get("chosen");
+  size_t     Size   = 0;
+  UINT8     *Wall   = Chosen ? dt_prop(Chosen, "wom-wall-clock", &Size) : NULL;
+
+  // 2020-01-01 .. 2100-01-01: anything else is not a wall clock
+  if (Wall != NULL && Size >= 16) {
+    UINT64 Seconds = ReadUnaligned64((UINT64 *)Wall);
+    UINT64 Counter = ReadUnaligned64((UINT64 *)(Wall + 8));
+    if (Seconds >= 1577836800ULL && Seconds < 4102444800ULL) {
+      mWallSeconds = Seconds;
+      mWallCounter = Counter;
+      mWallValid   = TRUE;
+    }
+  }
+  DEBUG((DEBUG_INFO, "RTC: %a\n", mWallValid ? "wall clock from the host" : "no wall clock, relative 2019-01"));
 
   return EFI_SUCCESS;
 }
